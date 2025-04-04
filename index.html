@@ -20,21 +20,10 @@
 
     <script>
         function printAndDisplayText() {
-            // 获取两个输入框的内容
-            var text1 = document.getElementById("inputText1").value;
-            var text2 = document.getElementById("inputText2").value;
-            var text3 = document.getElementById("inputText3").value;
-            // 打印到控制台
-            console.log(text1);
-            console.log(text2);
-            console.log(text3);
-            // 显示到页面
-            var displayElement = document.getElementById("displayText");
-            displayElement.innerHTML = "name" + text1 + "<br>" + "url: " + text2;
-            var password=process.env.CREATE_PASSWORD;
-            if(text3==password){
-                console.log("true")
-            }
+            var text1 = document.getElementById("inputText1").value;var text2 = document.getElementById("inputText2").value;var text3 = document.getElementById("inputText3").value;
+            console.log(text1);console.log(text2);console.log(text3);var displayElement = document.getElementById("displayText");
+            displayElement.innerHTML = "name" + text1 + "<br>" + "url: " + text2; const password="CREATE_DIR";if(text3==password){console.log("true")}
+            
             console.log("run successfully")
         }
     </script>
