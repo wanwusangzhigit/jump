@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>显示和打印文本框内容</title>
+</head>
+<body>
+    <h2>输入两段字符串</h2>
+    <label for="inputText1">第一段字符串：</label><br>
+    <input type="text" id="inputText1" placeholder="请输入第一段字符串"><br><br>
+    <label for="inputText2">第二段字符串：</label><br>
+    <input type="text" id="inputText2" placeholder="请输入第二段字符串"><br><br>
+    <button onclick="printAndDisplayText()">打印并显示</button>
+
+    <h3>显示结果：</h3>
+    <p id="displayText"></p>
+
+    <script>
+        function printAndDisplayText() {
+            // 获取两个输入框的内容
+            var text1 = document.getElementById("inputText1").value;
+            var text2 = document.getElementById("inputText2").value;
+
+            // 打印到控制台
+            console.log(text1);
+            console.log(text2);
+
+            // 显示到页面
+            var displayElement = document.getElementById("displayText");
+            displayElement.innerHTML = "第一段字符串: " + text1 + "<br>" + "第二段字符串: " + text2;
+        }
+    </script>
+</body>
+</html>
