@@ -3,29 +3,277 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>jump</title>
+    <title>Redirect Manager (Multi-Device Sync)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .form-container {
+            background-color: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .list-container {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        input, button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #1557b0;
+        }
+        .redirect-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .redirect-item:last-child {
+            border-bottom: none;
+        }
+        .delete-btn {
+            background-color: #ea4335;
+        }
+        .delete-btn:hover {
+            background-color: #d33426;
+        }
+        .config-section {
+            background-color: #e8f0fe;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
 </head>
 <body>
-    <h2>jump</h2>
-    <label for="inputText1">name：</label><br>
-    <input type="text" id="inputText1" placeholder="name"><br><br>
-    <label for="inputText2">url：</label><br>
-    <input type="text" id="inputText2" placeholder="url"><br><br>
-    <label for="inputText3">password：</label><br>
-    <input type="text" id="inputText3" placeholder="password"><br><br>
-    <button onclick="printAndDisplayText()">ok</button>
+    <h1>Redirect Manager (Multi-Device Sync)</h1>
+    
+    <div class="config-section" id="configSection">
+        <h2>Configuration</h2>
+        <p>Enter your GitHub Gist ID and Personal Access Token (PAT) to enable multi-device sync:</p>
+        <input type="text" id="gistIdInput" placeholder="Enter Gist ID" required>
+        <input type="password" id="patInput" placeholder="Enter GitHub PAT" required>
+        <button id="saveConfigBtn">Save Configuration</button>
+        <p id="configStatus"></p>
+    </div>
 
-    <h3>data：</h3>
-    <p id="displayText"></p>
+    <div class="form-container">
+        <h2>Add Redirect</h2>
+        <form id="redirectForm">
+            <input type="text" id="nameInput" placeholder="Enter name (e.g., baidu)" required>
+            <input type="url" id="urlInput" placeholder="Enter URL (e.g., https://baidu.com)" required>
+            <button type="submit">Add Redirect</button>
+        </form>
+    </div>
+    
+    <div class="list-container">
+        <h2>Current Redirects</h2>
+        <div id="redirectList">
+            <!-- Redirect items will be added here dynamically -->
+        </div>
+    </div>
 
     <script>
-        function printAndDisplayText() {
-            var text1 = document.getElementById("inputText1").value;var text2 = document.getElementById("inputText2").value;var text3 = document.getElementById("inputText3").value;
-            console.log(text1);console.log(text2);console.log(text3);var displayElement = document.getElementById("displayText");
-            displayElement.innerHTML = "name" + text1 + "<br>" + "url: " + text2; const password="CREATE_DIR";if(text3==password){console.log("true")}
-            
-            console.log("run successfully")
+        // Configuration
+        const GIST_API_URL = 'https://api.github.com';
+        let gistId = '';
+        let pat = '';
+
+        // Load configuration from localStorage
+        function loadConfig() {
+            const savedConfig = localStorage.getItem('redirectManagerConfig');
+            if (savedConfig) {
+                const { gistId, pat } = JSON.parse(savedConfig);
+                document.getElementById('gistIdInput').value = gistId;
+                document.getElementById('patInput').value = pat;
+                this.gistId = gistId;
+                this.pat = pat;
+                document.getElementById('configSection').classList.add('hidden');
+                document.getElementById('configStatus').textContent = 'Configuration loaded successfully!';
+            }
         }
+
+        // Save configuration to localStorage
+        document.getElementById('saveConfigBtn').addEventListener('click', function() {
+            gistId = document.getElementById('gistIdInput').value.trim();
+            pat = document.getElementById('patInput').value.trim();
+            
+            if (!gistId || !pat) {
+                alert('Please fill in both Gist ID and PAT');
+                return;
+            }
+            
+            localStorage.setItem('redirectManagerConfig', JSON.stringify({ gistId, pat }));
+            document.getElementById('configSection').classList.add('hidden');
+            document.getElementById('configStatus').textContent = 'Configuration saved successfully!';
+            
+            // Load redirects after configuration
+            loadRedirectsFromGist();
+        });
+
+        // Function to handle form submission
+        document.getElementById('redirectForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            
+            const name = document.getElementById('nameInput').value.trim();
+            const url = document.getElementById('urlInput').value.trim();
+            
+            if (!name || !url) {
+                alert('Please fill in both fields');
+                return;
+            }
+            
+            // Add redirect to local state
+            const redirects = JSON.parse(localStorage.getItem('redirects') || '{}');
+            redirects[name] = url;
+            localStorage.setItem('redirects', JSON.stringify(redirects));
+            
+            // Update Gist
+            updateGist(redirects);
+            
+            // Clear form
+            document.getElementById('redirectForm').reset();
+            
+            // Update the list
+            updateRedirectList();
+            
+            alert(`Redirect for "${name}" added successfully!`);
+        });
+
+        // Function to update the redirect list display
+        function updateRedirectList() {
+            const redirects = JSON.parse(localStorage.getItem('redirects') || '{}');
+            const redirectListElement = document.getElementById('redirectList');
+            redirectListElement.innerHTML = '';
+            
+            if (Object.keys(redirects).length === 0) {
+                redirectListElement.innerHTML = '<p>No redirects yet. Add one above!</p>';
+                return;
+            }
+            
+            for (const [name, url] of Object.entries(redirects)) {
+                const itemElement = document.createElement('div');
+                itemElement.className = 'redirect-item';
+                itemElement.innerHTML = `
+                    <strong>${name}</strong> → ${url}
+                    <button class="delete-btn" data-name="${name}">Delete</button>
+                `;
+                redirectListElement.appendChild(itemElement);
+            }
+            
+            // Add event listeners to delete buttons
+            document.querySelectorAll('.delete-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const name = this.getAttribute('data-name');
+                    const redirects = JSON.parse(localStorage.getItem('redirects') || '{}');
+                    delete redirects[name];
+                    localStorage.setItem('redirects', JSON.stringify(redirects));
+                    
+                    // Update Gist
+                    updateGist(redirects);
+                    
+                    updateRedirectList();
+                    alert(`Redirect for "${name}" deleted!`);
+                });
+            });
+        }
+
+        // Function to handle redirects when visiting specific paths
+        function handleRedirect() {
+            const path = window.location.pathname.replace(/^\//, '');
+            if (!path) return;
+            
+            const redirects = JSON.parse(localStorage.getItem('redirects') || '{}');
+            const url = redirects[path];
+            
+            if (url) {
+                window.location.href = url;
+            }
+        }
+
+        // Function to load redirects from Gist
+        function loadRedirectsFromGist() {
+            if (!gistId || !pat) return;
+            
+            fetch(`${GIST_API_URL}/gists/${gistId}`, {
+                headers: {
+                    'Authorization': `token ${pat}`
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to load redirects from Gist');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.files && data.files['redirects.json']) {
+                    const content = atob(data.files['redirects.json'].content);
+                    localStorage.setItem('redirects', content);
+                    updateRedirectList();
+                }
+            })
+            .catch(error => {
+                console.error('Error loading redirects:', error);
+                alert('Failed to load redirects from Gist. Using local storage instead.');
+            });
+        }
+
+        // Function to update Gist with new redirects
+        function updateGist(redirects) {
+            if (!gistId || !pat) return;
+            
+            const content = btoa(JSON.stringify(redirects));
+            
+            fetch(`${GIST_API_URL}/gists/${gistId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `token ${pat}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    files: {
+                        'redirects.json': {
+                            content
+                        }
+                    }
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to update Gist');
+                }
+                return response.json();
+            })
+            .catch(error => {
+                console.error('Error updating Gist:', error);
+                alert('Failed to update Gist. Changes are saved locally.');
+            });
+        }
+
+        // Initialize the app
+        window.addEventListener('load', function() {
+            loadConfig();
+            updateRedirectList();
+            handleRedirect();
+        });
     </script>
 </body>
 </html>
