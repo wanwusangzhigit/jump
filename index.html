@@ -3,17 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>显示和打印文本框内容</title>
+    <title>jump</title>
 </head>
 <body>
-    <h2>输入两段字符串</h2>
-    <label for="inputText1">第一段字符串：</label><br>
-    <input type="text" id="inputText1" placeholder="请输入第一段字符串"><br><br>
-    <label for="inputText2">第二段字符串：</label><br>
-    <input type="text" id="inputText2" placeholder="请输入第二段字符串"><br><br>
-    <button onclick="printAndDisplayText()">打印并显示</button>
+    <h2>jump</h2>
+    <label for="inputText1">name：</label><br>
+    <input type="text" id="inputText1" placeholder="name"><br><br>
+    <label for="inputText2">url：</label><br>
+    <input type="text" id="inputText2" placeholder="url"><br><br>
+    <label for="inputText3">password：</label><br>
+    <input type="text" id="inputText3" placeholder="password"><br><br>
+    <button onclick="printAndDisplayText()">ok</button>
 
-    <h3>显示结果：</h3>
+    <h3>data：</h3>
     <p id="displayText"></p>
 
     <script>
@@ -21,14 +23,19 @@
             // 获取两个输入框的内容
             var text1 = document.getElementById("inputText1").value;
             var text2 = document.getElementById("inputText2").value;
-
+            var text3 = document.getElementById("inputText3").value;
             // 打印到控制台
             console.log(text1);
             console.log(text2);
-
+            console.log(text3);
             // 显示到页面
             var displayElement = document.getElementById("displayText");
-            displayElement.innerHTML = "第一段字符串: " + text1 + "<br>" + "第二段字符串: " + text2;
+            displayElement.innerHTML = "name" + text1 + "<br>" + "url: " + text2;
+            var password=process.env.CREATE_PASSWORD;
+            if(text3==password){
+                console.log("true")
+            }
+            console.log("run successfully")
         }
     </script>
 </body>
