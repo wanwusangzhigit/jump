@@ -135,8 +135,14 @@
             const name = document.getElementById('nameInput').value.trim();
             const url = document.getElementById('urlInput').value.trim();
             
-            if (!name || !url) {
-                alert('Please fill in both fields');
+            // Validate name and url
+            if (!validateName(name)) {
+                alert('Name can only contain letters, numbers, and underscores');
+                return;
+            }
+            
+            if (!validateURL(url)) {
+                alert('Please enter a valid URL');
                 return;
             }
             
@@ -266,6 +272,18 @@
                 console.error('Error updating Gist:', error);
                 alert('Failed to update Gist. Changes are saved locally.');
             });
+        }
+
+        // Validate name
+        function validateName(name) {
+            const regex = /^[a-zA-Z0-9_]+$/;
+            return regex.test(name);
+        }
+
+        // Validate URL
+        function validateURL(url) {
+            const regex = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/;
+            return regex.test(url);
         }
 
         // Initialize the app
