@@ -1,297 +1,113 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Redirect Manager (Multi-Device Sync)</title>
+    <title>短链接服务</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            line-height: 1.6;
-        }
-        .form-container {
-            background-color: #f5f5f5;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        .list-container {
-            background-color: #f9f9f9;
-            padding: 20px;
-            border-radius: 8px;
-        }
-        input, button {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 10px;
-            box-sizing: border-box;
-        }
-        button {
-            background-color: #1a73e8;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #1557b0;
-        }
-        .redirect-item {
-            padding: 10px;
-            border-bottom: 1px solid #eee;
-        }
-        .redirect-item:last-child {
-            border-bottom: none;
-        }
-        .delete-btn {
-            background-color: #ea4335;
-        }
-        .delete-btn:hover {
-            background-color: #d33426;
-        }
-        .config-section {
-            background-color: #e8f0fe;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        .hidden {
-            display: none;
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .form-group { margin: 15px 0; }
+        input { width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px; }
+        button { background: #238636; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #2ea043; }
     </style>
 </head>
 <body>
-    <h1>Redirect Manager (Multi-Device Sync)</h1>
-    
-    <div class="config-section" id="configSection">
-        <h2>Configuration</h2>
-        <p>Enter your GitHub Gist ID and Personal Access Token (PAT) to enable multi-device sync:</p>
-        <input type="text" id="gistIdInput" placeholder="Enter Gist ID" required>
-        <input type="password" id="patInput" placeholder="Enter GitHub PAT" required>
-        <button id="saveConfigBtn">Save Configuration</button>
-        <p id="configStatus"></p>
-    </div>
-
-    <div class="form-container">
-        <h2>Add Redirect</h2>
-        <form id="redirectForm">
-            <input type="text" id="nameInput" placeholder="Enter name (e.g., baidu)" required>
-            <input type="url" id="urlInput" placeholder="Enter URL (e.g., https://baidu.com)" required>
-            <button type="submit">Add Redirect</button>
-        </form>
-    </div>
-    
-    <div class="list-container">
-        <h2>Current Redirects</h2>
-        <div id="redirectList">
-            <!-- Redirect items will be added here dynamically -->
+    <div id="app">
+        <h1>短链接管理</h1>
+        <div class="form-group">
+            <input type="text" id="name" placeholder="短链名称（如 baidu）" required>
         </div>
+        <div class="form-group">
+            <input type="url" id="url" placeholder="目标URL（如 https://baidu.com）" required>
+        </div>
+        <div class="form-group">
+            <input type="password" id="token" placeholder="GitHub Token（管理权限）">
+        </div>
+        <button onclick="handleSubmit()">提交</button>
+        <div id="message" style="margin-top: 15px;"></div>
     </div>
 
     <script>
-        // Configuration
-        const GIST_API_URL = 'https://api.github.com';
-        let gistId = '';
-        let pat = '';
-
-        // Load configuration from localStorage
-        function loadConfig() {
-            const savedConfig = localStorage.getItem('redirectManagerConfig');
-            if (savedConfig) {
-                const { gistId, pat } = JSON.parse(savedConfig);
-                document.getElementById('gistIdInput').value = gistId;
-                document.getElementById('patInput').value = pat;
-                this.gistId = gistId;
-                this.pat = pat;
-                document.getElementById('configSection').classList.add('hidden');
-                document.getElementById('configStatus').textContent = 'Configuration loaded successfully!';
-            }
-        }
-
-        // Save configuration to localStorage
-        document.getElementById('saveConfigBtn').addEventListener('click', function() {
-            gistId = document.getElementById('gistIdInput').value.trim();
-            pat = document.getElementById('patInput').value.trim();
-            
-            if (!gistId || !pat) {
-                alert('Please fill in both Gist ID and PAT');
-                return;
-            }
-            
-            localStorage.setItem('redirectManagerConfig', JSON.stringify({ gistId, pat }));
-            document.getElementById('configSection').classList.add('hidden');
-            document.getElementById('configStatus').textContent = 'Configuration saved successfully!';
-            
-            // Load redirects after configuration
-            loadRedirectsFromGist();
-        });
-
-        // Function to handle form submission
-        document.getElementById('redirectForm').addEventListener('submit', function(event) {
-            event.preventDefault();
-            
-            const name = document.getElementById('nameInput').value.trim();
-            const url = document.getElementById('urlInput').value.trim();
-            
-            // Validate name and url
-            if (!validateName(name)) {
-                alert('Name can only contain letters, numbers, and underscores');
-                return;
-            }
-            
-            if (!validateURL(url)) {
-                alert('Please enter a valid URL');
-                return;
-            }
-            
-            // Add redirect to local state
-            const redirects = JSON.parse(localStorage.getItem('redirects') || '{}');
-            redirects[name] = url;
-            localStorage.setItem('redirects', JSON.stringify(redirects));
-            
-            // Update Gist
-            updateGist(redirects);
-            
-            // Clear form
-            document.getElementById('redirectForm').reset();
-            
-            // Update the list
-            updateRedirectList();
-            
-            alert(`Redirect for "${name}" added successfully!`);
-        });
-
-        // Function to update the redirect list display
-        function updateRedirectList() {
-            const redirects = JSON.parse(localStorage.getItem('redirects') || '{}');
-            const redirectListElement = document.getElementById('redirectList');
-            redirectListElement.innerHTML = '';
-            
-            if (Object.keys(redirects).length === 0) {
-                redirectListElement.innerHTML = '<p>No redirects yet. Add one above!</p>';
-                return;
-            }
-            
-            for (const [name, url] of Object.entries(redirects)) {
-                const itemElement = document.createElement('div');
-                itemElement.className = 'redirect-item';
-                itemElement.innerHTML = `
-                    <strong>${name}</strong> → ${url}
-                    <button class="delete-btn" data-name="${name}">Delete</button>
-                `;
-                redirectListElement.appendChild(itemElement);
-            }
-            
-            // Add event listeners to delete buttons
-            document.querySelectorAll('.delete-btn').forEach(button => {
-                button.addEventListener('click', function() {
-                    const name = this.getAttribute('data-name');
-                    const redirects = JSON.parse(localStorage.getItem('redirects') || '{}');
-                    delete redirects[name];
-                    localStorage.setItem('redirects', JSON.stringify(redirects));
-                    
-                    // Update Gist
-                    updateGist(redirects);
-                    
-                    updateRedirectList();
-                    alert(`Redirect for "${name}" deleted!`);
-                });
-            });
-        }
-
-        // Function to handle redirects when visiting specific paths
-        function handleRedirect() {
+        // 自动跳转逻辑
+        (async () => {
             const path = window.location.pathname.replace(/^\//, '');
             if (!path) return;
-            
-            const redirects = JSON.parse(localStorage.getItem('redirects') || '{}');
-            const url = redirects[path];
-            
-            if (url) {
-                window.location.href = url;
+
+            try {
+                const response = await fetch(`/data/redirects.json?t=${Date.now()}`);
+                const data = await response.json();
+                const target = data.find(item => item.name === path)?.url;
+
+                target ? window.location.replace(target) 
+                     : document.body.innerHTML = '<h1>404 - 短链接不存在</h1>';
+            } catch (error) {
+                console.error('跳转错误:', error);
+            }
+        })();
+
+        // 提交处理
+        async function handleSubmit() {
+            const name = document.getElementById('name').value.trim();
+            const url = document.getElementById('url').value.trim();
+            const token = document.getElementById('token').value.trim();
+
+            if (!name || !url) {
+                showMessage('名称和URL不能为空', 'red');
+                return;
+            }
+
+            try {
+                const apiUrl = 'https://api.github.com/repos/[YOUR_USERNAME]/[YOUR_REPO]/contents/data/redirects.json';
+                
+                // 获取当前数据
+                const currentFile = await fetch(apiUrl).then(r => r.json());
+                const content = atob(currentFile.content.replace(/\s/g, ''));
+                let data = JSON.parse(content);
+
+                // 检查重复
+                const existingIndex = data.findIndex(item => item.name === name);
+                if (existingIndex > -1 && !confirm(`"${name}" 已存在，确认覆盖吗？`)) return;
+
+                // 更新数据
+                if (existingIndex > -1) {
+                    data[existingIndex].url = url;
+                } else {
+                    data.push({ name, url });
+                }
+
+                // 提交到GitHub
+                const res = await fetch(apiUrl, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: `${existingIndex > -1 ? '更新' : '新增'}短链接: ${name}`,
+                        content: btoa(JSON.stringify(data, null, 2)),
+                        sha: currentFile.sha
+                    })
+                });
+
+                if (res.ok) {
+                    showMessage('操作成功！同步可能需要1-2分钟', 'green');
+                    document.getElementById('name').value = '';
+                    document.getElementById('url').value = '';
+                } else {
+                    throw new Error(await res.text());
+                }
+            } catch (error) {
+                showMessage(`操作失败: ${error.message}`, 'red');
             }
         }
 
-        // Function to load redirects from Gist
-        function loadRedirectsFromGist() {
-            if (!gistId || !pat) return;
-            
-            fetch(`${GIST_API_URL}/gists/${gistId}`, {
-                headers: {
-                    'Authorization': `token ${pat}`
-                }
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Failed to load redirects from Gist');
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.files && data.files['redirects.json']) {
-                    const content = atob(data.files['redirects.json'].content);
-                    localStorage.setItem('redirects', content);
-                    updateRedirectList();
-                }
-            })
-            .catch(error => {
-                console.error('Error loading redirects:', error);
-                alert('Failed to load redirects from Gist. Using local storage instead.');
-            });
+        function showMessage(text, color) {
+            const msgDiv = document.getElementById('message');
+            msgDiv.style.color = color;
+            msgDiv.textContent = text;
+            setTimeout(() => msgDiv.textContent = '', 5000);
         }
-
-        // Function to update Gist with new redirects
-        function updateGist(redirects) {
-            if (!gistId || !pat) return;
-            
-            const content = btoa(JSON.stringify(redirects));
-            
-            fetch(`${GIST_API_URL}/gists/${gistId}`, {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': `token ${pat}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    files: {
-                        'redirects.json': {
-                            content
-                        }
-                    }
-                })
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Failed to update Gist');
-                }
-                return response.json();
-            })
-            .catch(error => {
-                console.error('Error updating Gist:', error);
-                alert('Failed to update Gist. Changes are saved locally.');
-            });
-        }
-
-        // Validate name
-        function validateName(name) {
-            const regex = /^[a-zA-Z0-9_]+$/;
-            return regex.test(name);
-        }
-
-        // Validate URL
-        function validateURL(url) {
-            const regex = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/;
-            return regex.test(url);
-        }
-
-        // Initialize the app
-        window.addEventListener('load', function() {
-            loadConfig();
-            updateRedirectList();
-            handleRedirect();
-        });
     </script>
 </body>
 </html>
