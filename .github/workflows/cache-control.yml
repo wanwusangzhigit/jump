@@ -2,6 +2,7 @@ name: Cache Purge
 on:
   push:
     paths:
+    
       - 'data/redirects.json'
 
 jobs:
