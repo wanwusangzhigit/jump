@@ -1,0 +1,26 @@
+name: Cache Control
+on: 
+  push:
+    paths:
+      - 'data/redirects.json'
+
+jobs:
+  purge-cdn:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Purge CDN cache
+        uses: actions/github-script@v6
+        with:
+          script: |
+            await github.rest.repos.deletePagesSite({
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            })
+            await github.rest.repos.createPagesSite({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              source: {
+                branch: 'main',
+                path: '/'
+              }
+            })
