@@ -1,0 +1,11 @@
+<script>
+    // 单页应用路由处理
+    const redirect = sessionStorage.redirect;
+    delete sessionStorage.redirect;
+    if (redirect && redirect != location.href) {
+        history.replaceState(null, null, redirect);
+        location.replace(redirect);
+    } else {
+        location.replace('/');
+    }
+</script>
