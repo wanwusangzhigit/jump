@@ -1,11 +1,12 @@
 <script>
-    // 单页应用路由处理
-    const redirect = sessionStorage.redirect;
-    delete sessionStorage.redirect;
-    if (redirect && redirect != location.href) {
-        history.replaceState(null, null, redirect);
-        location.replace(redirect);
-    } else {
-        location.replace('/');
+(function(){
+    const path = location.pathname;
+    if (path !== "/") {
+        localStorage.setItem('redirect-attempt', JSON.stringify({
+            path: path,
+            timestamp: Date.now()
+        }));
+        location.replace('/?t=' + Date.now());
     }
+})();
 </script>
