@@ -5,108 +5,140 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>短链接服务</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-        .form-group { margin: 15px 0; }
-        input { width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px; }
-        button { background: #238636; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
-        button:hover { background: #2ea043; }
+        /* 优化后的样式 */
+        :root { --primary: #2ea043; --error: #da3633; }
+        body { font-family: system-ui, sans-serif; max-width: 680px; margin: 2rem auto; padding: 0 1rem; }
+        .card { background: #f6f8fa; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #d0d7de; border-radius: 6px; }
+        button { background: var(--primary); color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; transition: opacity 0.2s; }
+        button:hover { opacity: 0.9; }
+        .message { padding: 12px; border-radius: 6px; margin: 1rem 0; display: none; }
+        .visible { display: block; }
+        .success { background: #ddf4df; color: #1a7f37; }
+        .error { background: #ffd7d5; color: var(--error); }
     </style>
 </head>
 <body>
-    <div id="app">
-        <h1>短链接管理</h1>
-        <div class="form-group">
-            <input type="text" id="name" placeholder="短链名称（如 baidu）" required>
+    <div class="card">
+        <h1 style="margin-bottom: 1.5rem;">短链接管理</h1>
+        <div style="margin-bottom: 1rem;">
+            <input type="text" id="name" placeholder="短链名称（示例：baidu）" pattern="[a-zA-Z0-9-_]{2,20}" required>
         </div>
-        <div class="form-group">
-            <input type="url" id="url" placeholder="目标URL（如 https://baidu.com）" required>
+        <div style="margin-bottom: 1rem;">
+            <input type="url" id="url" placeholder="目标URL（示例：https://baidu.com）" required>
         </div>
-        <div class="form-group">
+        <div style="margin-bottom: 1.5rem;">
             <input type="password" id="token" placeholder="GitHub Token（管理权限）">
         </div>
-        <button onclick="handleSubmit()">提交</button>
-        <div id="message" style="margin-top: 15px;"></div>
+        <button onclick="handleSubmit()">提交配置</button>
+        <div id="message" class="message"></div>
     </div>
 
     <script>
-        // 自动跳转逻辑
+        // 初始化逻辑
         (async () => {
+            // 处理重定向请求
+            const redirectAttempt = localStorage.getItem('redirect-attempt');
+            if (redirectAttempt) {
+                const { path } = JSON.parse(redirectAttempt);
+                localStorage.removeItem('redirect-attempt');
+                history.replaceState(null, null, path);
+            }
+
+            // 跳转逻辑
             const path = window.location.pathname.replace(/^\//, '');
             if (!path) return;
 
             try {
                 const response = await fetch(`/data/redirects.json?t=${Date.now()}`);
+                if (!response.ok) throw new Error('Failed to load redirect rules');
+                
                 const data = await response.json();
                 const target = data.find(item => item.name === path)?.url;
 
                 target ? window.location.replace(target) 
-                     : document.body.innerHTML = '<h1>404 - 短链接不存在</h1>';
+                     : showErrorPage(path);
             } catch (error) {
-                console.error('跳转错误:', error);
+                showErrorPage(path, error.message);
             }
         })();
 
-        // 提交处理
         async function handleSubmit() {
             const name = document.getElementById('name').value.trim();
             const url = document.getElementById('url').value.trim();
             const token = document.getElementById('token').value.trim();
 
-            if (!name || !url) {
-                showMessage('名称和URL不能为空', 'red');
-                return;
+            // 输入验证
+            if (!name || !url) return showMessage('名称和URL不能为空', 'error');
+            if (!/^[a-zA-Z0-9-_]{2,20}$/.test(name)) {
+                return showMessage('名称格式错误：2-20位字母/数字/-/_', 'error');
             }
 
             try {
-                const apiUrl = 'https://api.github.com/repos/[YOUR_USERNAME]/[YOUR_REPO]/contents/data/redirects.json';
+                const API_ENDPOINT = 'https://api.github.com/repos/YOUR_USERNAME/YOUR_REPO/contents/data/redirects.json';
                 
                 // 获取当前数据
-                const currentFile = await fetch(apiUrl).then(r => r.json());
-                const content = atob(currentFile.content.replace(/\s/g, ''));
-                let data = JSON.parse(content);
+                const { content, sha } = await fetch(API_ENDPOINT)
+                    .then(r => r.json())
+                    .then(data => ({
+                        content: atob(data.content.replace(/\s/g, '')),
+                        sha: data.sha
+                    }));
 
-                // 检查重复
-                const existingIndex = data.findIndex(item => item.name === name);
-                if (existingIndex > -1 && !confirm(`"${name}" 已存在，确认覆盖吗？`)) return;
+                let redirects = JSON.parse(content);
+                const existingIndex = redirects.findIndex(item => item.name === name);
 
                 // 更新数据
+                if (existingIndex > -1 && !confirm(`"${name}" 已存在，确认覆盖吗？`)) return;
+                
                 if (existingIndex > -1) {
-                    data[existingIndex].url = url;
+                    redirects[existingIndex].url = url;
                 } else {
-                    data.push({ name, url });
+                    redirects.push({ name, url });
                 }
 
-                // 提交到GitHub
-                const res = await fetch(apiUrl, {
+                // 提交更新
+                const res = await fetch(API_ENDPOINT, {
                     method: 'PUT',
                     headers: {
-                        'Authorization': `token ${token}`,
+                        'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        message: `${existingIndex > -1 ? '更新' : '新增'}短链接: ${name}`,
-                        content: btoa(JSON.stringify(data, null, 2)),
-                        sha: currentFile.sha
+                        message: `${existingIndex > -1 ? 'Update' : 'Add'} redirect: ${name}`,
+                        content: btoa(JSON.stringify(redirects, null, 2)),
+                        sha
                     })
                 });
 
-                if (res.ok) {
-                    showMessage('操作成功！同步可能需要1-2分钟', 'green');
-                    document.getElementById('name').value = '';
-                    document.getElementById('url').value = '';
-                } else {
-                    throw new Error(await res.text());
+                if (!res.ok) {
+                    const errorData = await res.json();
+                    throw new Error(errorData.message || 'API请求失败');
                 }
+
+                showMessage('配置已提交，生效时间约1-2分钟', 'success');
+                document.getElementById('name').value = '';
+                document.getElementById('url').value = '';
             } catch (error) {
-                showMessage(`操作失败: ${error.message}`, 'red');
+                showMessage(`操作失败: ${error.message.replace('API 错误: ', '')}`, 'error');
             }
         }
 
-        function showMessage(text, color) {
+        function showMessage(text, type) {
             const msgDiv = document.getElementById('message');
-            msgDiv.style.color = color;
             msgDiv.textContent = text;
-            setTimeout(() => msgDiv.textContent = '', 5000);
+            msgDiv.className = `message visible ${type}`;
+            setTimeout(() => msgDiv.className = 'message', 3000);
+        }
+
+        function showErrorPage(path, errorMsg) {
+            document.body.innerHTML = `
+                <div class="card" style="text-align: center;">
+                    <h2 style="color: var(--error);">${errorMsg ? '系统错误' : '404未找到'}</h2>
+                    <p>${errorMsg || `请求的短链接 /${path} 不存在`}</p>
+                    <a href="/" style="color: var(--primary); text-decoration: none;">&larr; 返回首页</a>
+                </div>
+            `;
         }
     </script>
 </body>
