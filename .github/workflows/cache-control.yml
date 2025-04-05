@@ -1,0 +1,32 @@
+name: Cache Purge
+on:
+  push:
+    paths:
+      - 'data/redirects.json'
+
+jobs:
+  purge-cache:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Purge GitHub Pages Cache
+        uses: actions/github-script@v6
+        with:
+          script: |
+            try {
+              await github.rest.repos.deletePagesSite({
+                owner: context.repo.owner,
+                repo: context.repo.repo
+              })
+              await new Promise(resolve => setTimeout(resolve, 5000))
+              await github.rest.repos.createPagesSite({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                source: {
+                  branch: 'main',
+                  path: '/'
+                }
+              })
+              console.log('CDN缓存已刷新')
+            } catch (error) {
+              core.setFailed('缓存清理失败: ' + error.message)
+            }
