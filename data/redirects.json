@@ -2,5 +2,9 @@
   {
     "name": "gh",
     "url": "https://bgithub.xyz/"
+  },
+  {
+    "name": "baidu",
+    "url": "https://baidu.com"
   }
 ]
